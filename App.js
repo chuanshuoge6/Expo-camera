@@ -16,7 +16,6 @@ import {
   Ionicons, MaterialIcons, Foundation,
   MaterialCommunityIcons, Octicons
 } from '@expo/vector-icons';
-import InfiniteScroll from 'react-native-infinite-looping-scroll';
 import * as Font from 'expo-font'
 
 export default function App() {
@@ -27,6 +26,12 @@ export default function App() {
   const [autoFocus, setautoFocus] = useState('on')
   const [whiteBalance, setwhiteBalance] = useState(0)
   const [zoomScale, setzoomScale] = useState(0)
+  const [flash, setflash] = useState(1)
+  const [ratios, setratios] = useState([])
+  const [selectedRatio, setselectRatio] = useState('16:9')
+  const [showOption, setshowOption] = useState(false)
+  const [pictureSizes, setpictureSizes] = useState([])
+  const [selectedSize, setselectedSize] = useState(0)
 
   const wbOrder = [
     'sunny',
@@ -44,6 +49,20 @@ export default function App() {
     'beach-access',
     'wb-iridescent',
     'wb-incandescent',
+  ]
+
+  const flashModeOrder = [
+    'on',
+    'auto',
+    'torch',
+    'off',
+  ]
+
+  const flashIcons = [
+    'flash-on',
+    'flash-auto',
+    'highlight',
+    'flash-off',
   ]
 
   useEffect(async () => {
@@ -103,6 +122,10 @@ export default function App() {
       setcameraDirection(Camera.Constants.Type.back)
   }
 
+  toggleFlash = () => {
+    flash < 3 ? setflash(flash + 1) : setflash(0)
+  }
+
   onZoomEvent = Animated.event(
     [
       {
@@ -129,6 +152,68 @@ export default function App() {
     }
   }
 
+  ratio_size = async () => {
+    const ratios = await this.camera.getSupportedRatiosAsync()
+    setratios(ratios)
+
+    availablePicSize()
+  }
+
+  availablePicSize = async () => {
+    let sizes
+    try {
+      sizes = await this.camera.getAvailablePictureSizesAsync(selectedRatio);
+    }
+    catch (err) {
+      //delete ratio that has no supported picture size
+      setratios(ratios.filter(item => { return item !== selectedRatio }))
+      setselectRatio('16:9')
+
+      sizes = await this.camera.getAvailablePictureSizesAsync('16:9');
+    }
+
+    setpictureSizes(sizes)
+    setselectedSize(sizes.length - 1)
+  }
+
+  toggleShowOption = () => {
+    showOption ? setshowOption(false) : setshowOption(true)
+  }
+
+  nextRatio = async () => {
+    const length = ratios.length
+    if (length === 0) { return }
+
+    const index = ratios.findIndex(item => { return item === selectedRatio })
+    index < length - 1 ? await setselectRatio(ratios[index + 1]) : await setselectRatio(ratios[0])
+
+    availablePicSize()
+  }
+
+  previousRatio = async () => {
+    const length = ratios.length
+    if (length === 0) { return }
+
+    const index = ratios.findIndex(item => { return item === selectedRatio })
+    index > 0 ? await setselectRatio(ratios[index - 1]) : await setselectRatio(ratios[length - 1])
+
+    availablePicSize()
+  }
+
+  nextSize = () => {
+    const length = pictureSizes.length
+    if (length === 0) { return }
+
+    selectedSize < length - 1 ? setselectedSize(selectedSize + 1) : setselectedSize(0)
+  }
+
+  previousSize = () => {
+    const length = pictureSizes.length
+    if (length === 0) { return }
+
+    selectedSize > 0 ? setselectedSize(selectedSize - 1) : setselectedSize(length - 1)
+  }
+
   if (cameraPermission !== 'granted' || storagePermission !== 'granted') {
     return <Text style={{ marginTop: 25 }}>App uses camera and storage</Text>;
   }
@@ -145,10 +230,13 @@ export default function App() {
 
         <Camera style={{ flex: 1 }}
           type={cameraDirection}
+          onCameraReady={() => ratio_size()}
+          pictureSize={pictureSizes[selectedSize]}
           autoFocus={autoFocus}
           whiteBalance={wbOrder[whiteBalance]}
           focusDepth={1}
           zoom={zoomScale}
+          flashMode={flashModeOrder[flash]}
           ref={ref => { this.camera = ref }}>
 
           <View style={{
@@ -162,24 +250,20 @@ export default function App() {
                   backgroundColor: 'transparent',
                 }} >
                 <Button rounded transparent style={{ height: 50, marginLeft: 40, marginRight: 20 }}
+                  onPress={() => toggleCamera()}>
+                  <Ionicons name="ios-reverse-camera" size={40} color="white" />
+                </Button>
+                <Button rounded transparent style={{ height: 50, marginHorizontal: 40 }}
+                  onPress={() => toggleFlash()}>
+                  <MaterialIcons name={flashIcons[flash]} size={40} color="white" />
+                </Button>
+                <Button rounded transparent style={{ height: 50, marginHorizontal: 20 }}
                   onPress={() => togglewhiteBalance()}>
                   <MaterialIcons name={wbIcons[whiteBalance]} size={40} color="white" />
                 </Button>
                 <Button rounded transparent style={{ height: 50, marginHorizontal: 20 }}
                   onPress={() => alert('double finger gesture\nstretch => zoom in\nsqueeze => zoom out')}>
                   <Text style={{ color: 'white', fontSize: 25 }}>x{(1 + 4 * zoomScale).toFixed(1)}</Text>
-                </Button>
-                <Button rounded transparent style={{ height: 50, marginHorizontal: 20 }}
-                  onPress={() => toggleCamera()}>
-                  <Ionicons name="ios-reverse-camera" size={40} color="white" />
-                </Button>
-                <Button rounded transparent style={{ height: 50, marginHorizontal: 20 }}
-                  onPress={() => toggleautoFocus()}>
-                  <Text style={{ color: autoFocus === 'on' ? "white" : "#6b6b6b", fontSize: 25 }}>AF</Text>
-                </Button>
-                <Button rounded transparent style={{ height: 50, marginHorizontal: 20 }}
-                  onPress={() => toggleautoFocus()}>
-                  <Text style={{ color: autoFocus === 'on' ? "white" : "#6b6b6b", fontSize: 25 }}>AF</Text>
                 </Button>
                 <Button rounded transparent style={{ height: 50, marginHorizontal: 20 }}
                   onPress={() => toggleautoFocus()}>
@@ -190,15 +274,92 @@ export default function App() {
             <View style={{
               flex: 0.12,
               backgroundColor: 'transparent',
-              justifyContent: 'center',
+              justifyContent: 'space-around',
               flexDirection: 'row',
               marginBottom: 25,
             }}>
+              <Button rounded transparent style={{ height: 50, marginTop: 15 }}
+                onPress={() => { toggleShowOption() }}>
+                <Octicons name="kebab-horizontal" size={40} color="white" />
+              </Button>
               <Button rounded transparent style={{ height: 80 }}
                 onPress={() => { takePicture() }}>
                 <Icon name='camera' style={{ fontSize: 60, color: 'white' }} ></Icon>
               </Button>
+              <Button rounded transparent style={{ height: 50, marginTop: 15 }}
+                onPress={() => { toggleShowOption() }}>
+                <Octicons name="kebab-horizontal" size={40} color="white" />
+              </Button>
             </View>
+            {showOption ?
+              <View style={{
+                position: 'absolute',
+                bottom: 100,
+                left: 30,
+                width: 200,
+                height: 160,
+                backgroundColor: '#000000BA',
+                borderRadius: 4,
+                padding: 10,
+              }}>
+                <View style={{
+                  flex: 1,
+                  justifyContent: 'space-around',
+                }}>
+                  <View>
+                    <Text style={{ fontSize: 15, alignSelf: 'center', color: 'white' }}>
+                      Ratio</Text>
+                    <View style={{
+                      justifyContent: 'space-around',
+                      flexDirection: 'row'
+                    }}>
+                      <Button small iconLeft style={{ backgroundColor: '#000000BA' }}
+                        onPress={() => previousRatio()} >
+                        <Ionicons name="md-arrow-dropleft" size={20} color="white" />
+                        <Text> </Text>
+                      </Button>
+
+                      <Text style={{ color: 'white', fontSize: 15, marginTop: 5 }}>{selectedRatio}</Text>
+
+                      <Button small iconRight style={{ backgroundColor: '#000000BA' }}
+                        onPress={() => nextRatio()} >
+                        <Text> </Text>
+                        <Ionicons name="md-arrow-dropright" size={20} color="white" />
+                      </Button>
+                    </View>
+                  </View>
+
+                  <View style={{
+                    flex: 1,
+                    justifyContent: 'space-around',
+                  }}>
+                    <View>
+                      <Text style={{ fontSize: 15, alignSelf: 'center', color: 'white' }}>
+                        Size</Text>
+                      <View style={{
+                        justifyContent: 'space-around',
+                        flexDirection: 'row'
+                      }}>
+                        <Button small iconLeft style={{ backgroundColor: '#000000BA' }}
+                          onPress={() => previousSize()} >
+                          <Ionicons name="md-arrow-dropleft" size={20} color="white" />
+                          <Text> </Text>
+                        </Button>
+
+                        <Text style={{ color: 'white', fontSize: 15, marginTop: 5 }}>
+                          {pictureSizes.length > 0 ? pictureSizes[selectedSize] : ' '}</Text>
+
+                        <Button small iconRight style={{ backgroundColor: '#000000BA' }}
+                          onPress={() => nextSize()} >
+                          <Text> </Text>
+                          <Ionicons name="md-arrow-dropright" size={20} color="white" />
+                        </Button>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </View> :
+              null}
           </View>
 
         </Camera>
