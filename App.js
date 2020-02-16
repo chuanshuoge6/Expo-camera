@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Camera } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { PinchGestureHandler } from 'react-native-gesture-handler';
+import { BarCodeScanner } from 'expo-barcode-scanner';
+import * as WebBrowser from 'expo-web-browser';
 import { Animated, ScrollView } from 'react-native'
 import {
   Container, Header, Title, Content, Footer,
@@ -32,6 +34,10 @@ export default function App() {
   const [showOption, setshowOption] = useState(false)
   const [pictureSizes, setpictureSizes] = useState([])
   const [selectedSize, setselectedSize] = useState(0)
+  const [showOption2, setshowOption2] = useState(false)
+  const [scanCode, setscanCode] = useState(false)
+  const [detectFace, setdetectFace] = useState(false)
+  const [faces, setfaces] = useState([])
 
   const wbOrder = [
     'sunny',
@@ -103,7 +109,7 @@ export default function App() {
           alert('image saved!')
         })
         .catch(error => {
-          alert('An Error Occurred!')
+          alert(error)
         });
     }
   }
@@ -214,6 +220,35 @@ export default function App() {
     selectedSize > 0 ? setselectedSize(selectedSize - 1) : setselectedSize(length - 1)
   }
 
+  toggleShowOption2 = () => {
+    showOption2 ? setshowOption2(false) : setshowOption2(true)
+  }
+
+  toggleScanCode = () => {
+    scanCode ? setscanCode(false) : setscanCode(true)
+  }
+
+  toggleDetectFace = () => {
+    detectFace ? setdetectFace(false) : setdetectFace(true)
+  }
+
+  processCodeScan = async (code) => {
+    toggleScanCode()
+    console.log(code)
+    try {
+      let result = await WebBrowser.openBrowserAsync(code.data);
+      console.log(result)
+    }
+    catch (err) {
+      alert(err)
+    }
+  }
+
+  processFaces = async (f) => {
+    f.faces.length > 0 ? await setfaces(f.faces) : null
+    //console.log(f.faces.length, faces)
+  }
+
   if (cameraPermission !== 'granted' || storagePermission !== 'granted') {
     return <Text style={{ marginTop: 25 }}>App uses camera and storage</Text>;
   }
@@ -228,7 +263,7 @@ export default function App() {
       onHandlerStateChange={(e) => onZoomStateChange(e)}>
       <View style={{ flex: 1, backgroundColor: 'transparent' }}>
 
-        <Camera style={{ flex: 1 }}
+        <Camera style={{ flex: 1, zIndex: 3 }}
           type={cameraDirection}
           onCameraReady={() => ratio_size()}
           pictureSize={pictureSizes[selectedSize]}
@@ -237,6 +272,15 @@ export default function App() {
           focusDepth={1}
           zoom={zoomScale}
           flashMode={flashModeOrder[flash]}
+          barCodeScannerSettings={{
+            barCodeTypes: [
+              BarCodeScanner.Constants.BarCodeType.qr,
+              BarCodeScanner.Constants.BarCodeType.pdf417,
+            ],
+          }}
+          onBarCodeScanned={scanCode ? (c) => processCodeScan(c) : undefined}
+          onFacesDetected={detectFace ? (f) => processFaces(f) : undefined}
+          onFaceDetectionError={err => console.log(err)}
           ref={ref => { this.camera = ref }}>
 
           <View style={{
@@ -271,6 +315,7 @@ export default function App() {
                 </Button>
               </ScrollView>
             </View>
+
             <View style={{
               flex: 0.12,
               backgroundColor: 'transparent',
@@ -287,10 +332,11 @@ export default function App() {
                 <Icon name='camera' style={{ fontSize: 60, color: 'white' }} ></Icon>
               </Button>
               <Button rounded transparent style={{ height: 50, marginTop: 15 }}
-                onPress={() => { toggleShowOption() }}>
-                <Octicons name="kebab-horizontal" size={40} color="white" />
+                onPress={() => { toggleShowOption2() }}>
+                <MaterialIcons name="aspect-ratio" size={40} color="white" />
               </Button>
             </View>
+
             {showOption ?
               <View style={{
                 position: 'absolute',
@@ -360,7 +406,83 @@ export default function App() {
                 </View>
               </View> :
               null}
+
+            {showOption2 ?
+              <View style={{
+                position: 'absolute',
+                bottom: 100,
+                right: 30,
+                width: 160,
+                height: 80,
+                backgroundColor: '#000000BA',
+                borderRadius: 4,
+                padding: 10,
+              }}>
+                <View style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                }}>
+                  <View style={{
+                    justifyContent: 'space-around',
+                    flexDirection: 'row'
+                  }}>
+                    <Button small iconLeft style={{ backgroundColor: '#000000BA' }}
+                      onPress={() => toggleDetectFace()} >
+                      <MaterialIcons name="tag-faces" size={32} color={detectFace ? "white" : "#858585"} />
+                    </Button>
+
+                    <Button small iconRight style={{ backgroundColor: '#000000BA' }}
+                      onPress={() => toggleScanCode()} >
+                      <MaterialCommunityIcons name="barcode-scan" size={32} color={scanCode ? "white" : "#858585"} />
+                    </Button>
+                  </View>
+
+                </View>
+              </View> :
+              null}
           </View>
+
+          {detectFace ?
+            <View style={{
+              position: 'absolute',
+              bottom: 0,
+              right: 0,
+              left: 0,
+              top: 0,
+              backgroundColor: 'transparent',
+              zIndex: 2,
+            }}
+              pointerEvents="none">
+
+              {faces.length > 0 ? faces.map((face, index) => {
+                const { bounds, rollAngle, yawAngle } = face
+                //console.log(face)
+                const { origin, size } = bounds
+                //console.log(size.height, size.width, rollAngle, yawAngle)
+                return <View style={{
+                  borderWidth: 2,
+                  borderRadius: 2,
+                  position: 'absolute',
+                  borderColor: '#FFD700',
+                  backgroundColor: 'transparent',
+                  height: size.height,
+                  width: size.width,
+                  left: origin.x,
+                  top: origin.y,
+                }}
+                  transform={[
+                    { perspective: 600 },
+                    { rotateZ: rollAngle.toFixed(0).toString() + 'deg' },
+                    { rotateY: yawAngle.toFixed(0).toString() + 'deg' },
+                  ]}
+                  key={index}>
+
+                </View>
+              })
+                : null}
+            </View>
+            : null
+          }
 
         </Camera>
 
