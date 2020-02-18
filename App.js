@@ -4,7 +4,8 @@ import * as MediaLibrary from 'expo-media-library';
 import { PinchGestureHandler } from 'react-native-gesture-handler';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import * as WebBrowser from 'expo-web-browser';
-import { Animated, ScrollView } from 'react-native'
+import { Animated, ScrollView, Image } from 'react-native'
+import Editor from './Editor'
 import {
   Container, Header, Title, Content, Footer,
   FooterTab, Button, Left, Right, Body, Icon, Text,
@@ -34,10 +35,11 @@ export default function App() {
   const [showOption, setshowOption] = useState(false)
   const [pictureSizes, setpictureSizes] = useState([])
   const [selectedSize, setselectedSize] = useState(0)
-  const [showOption2, setshowOption2] = useState(false)
   const [scanCode, setscanCode] = useState(false)
   const [detectFace, setdetectFace] = useState(false)
   const [faces, setfaces] = useState([])
+  const [lastPicture, setlastPicture] = useState(null)
+  const [openEditor, setopenEditor] = useState(false)
 
   const wbOrder = [
     'sunny',
@@ -71,8 +73,11 @@ export default function App() {
     'flash-off',
   ]
 
-  useEffect(async () => {
+  useEffect(() => {
+    initializeApp()
+  }, [])
 
+  initializeApp = async () => {
     const grantCamera = await Camera.requestPermissionsAsync();
     setcameraPermission(grantCamera.status)
 
@@ -84,8 +89,7 @@ export default function App() {
       Roboto_medium: require("native-base/Fonts/Roboto_medium.ttf")
     })
     setloadfont(false)
-
-  }, [])
+  }
 
   //bug in software, need to toggle auto focus for some camera to work
   timeout = (sec) => { return new Promise(resolve => setTimeout(resolve, sec)) }
@@ -106,7 +110,7 @@ export default function App() {
 
       await MediaLibrary.saveToLibraryAsync(uri)
         .then(() => {
-          alert('image saved!')
+          setlastPicture(uri)
         })
         .catch(error => {
           alert(error)
@@ -220,10 +224,6 @@ export default function App() {
     selectedSize > 0 ? setselectedSize(selectedSize - 1) : setselectedSize(length - 1)
   }
 
-  toggleShowOption2 = () => {
-    showOption2 ? setshowOption2(false) : setshowOption2(true)
-  }
-
   toggleScanCode = () => {
     scanCode ? setscanCode(false) : setscanCode(true)
   }
@@ -331,10 +331,21 @@ export default function App() {
                 onPress={() => { takePicture() }}>
                 <Icon name='camera' style={{ fontSize: 60, color: 'white' }} ></Icon>
               </Button>
-              <Button rounded transparent style={{ height: 50, marginTop: 15 }}
-                onPress={() => { toggleShowOption2() }}>
-                <MaterialIcons name="aspect-ratio" size={40} color="white" />
+
+              <Button rounded transparent style={{ height: 80 }}
+                onPress={() => setopenEditor(true)}>
+                <Image source={{ uri: lastPicture }}
+                  style={{
+                    resizeMode: 'cover',
+                    height: 50,
+                    width: 50,
+                    borderRadius: 25,
+                    borderWidth: 1,
+                    borderColor: 'white',
+                  }}>
+                </Image>
               </Button>
+
             </View>
 
             {showOption ?
@@ -343,7 +354,7 @@ export default function App() {
                 bottom: 100,
                 left: 30,
                 width: 200,
-                height: 160,
+                height: 200,
                 backgroundColor: '#000000BA',
                 borderRadius: 4,
                 padding: 10,
@@ -403,43 +414,31 @@ export default function App() {
                       </View>
                     </View>
                   </View>
-                </View>
-              </View> :
-              null}
 
-            {showOption2 ?
-              <View style={{
-                position: 'absolute',
-                bottom: 100,
-                right: 30,
-                width: 160,
-                height: 80,
-                backgroundColor: '#000000BA',
-                borderRadius: 4,
-                padding: 10,
-              }}>
-                <View style={{
-                  flex: 1,
-                  justifyContent: 'center',
-                }}>
                   <View style={{
-                    justifyContent: 'space-around',
-                    flexDirection: 'row'
+                    flex: 1,
+                    justifyContent: 'center',
                   }}>
-                    <Button small iconLeft style={{ backgroundColor: '#000000BA' }}
-                      onPress={() => toggleDetectFace()} >
-                      <MaterialIcons name="tag-faces" size={32} color={detectFace ? "white" : "#858585"} />
-                    </Button>
+                    <View style={{
+                      justifyContent: 'space-around',
+                      flexDirection: 'row'
+                    }}>
+                      <Button small iconLeft style={{ backgroundColor: '#000000BA' }}
+                        onPress={() => toggleDetectFace()} >
+                        <MaterialIcons name="tag-faces" size={32} color={detectFace ? "white" : "#858585"} />
+                      </Button>
 
-                    <Button small iconRight style={{ backgroundColor: '#000000BA' }}
-                      onPress={() => toggleScanCode()} >
-                      <MaterialCommunityIcons name="barcode-scan" size={32} color={scanCode ? "white" : "#858585"} />
-                    </Button>
+                      <Button small iconRight style={{ backgroundColor: '#000000BA' }}
+                        onPress={() => toggleScanCode()} >
+                        <MaterialCommunityIcons name="barcode-scan" size={32} color={scanCode ? "white" : "#858585"} />
+                      </Button>
+                    </View>
                   </View>
 
                 </View>
               </View> :
               null}
+
           </View>
 
           {detectFace ?
@@ -486,6 +485,18 @@ export default function App() {
 
         </Camera>
 
+        {openEditor ?
+          <View style={{
+            position: 'absolute',
+            bottom: 0,
+            right: 0,
+            left: 0,
+            top: 0,
+            backgroundColor: 'white',
+            zIndex: 4,
+          }}>
+            <Editor picture={lastPicture} closeEditor={() => setopenEditor(false)}></Editor>
+          </View> : null}
       </View>
     </PinchGestureHandler>
   );
