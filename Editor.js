@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BackHandler } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
-import { ScrollView, Image, Dimensions } from 'react-native'
+import ExpoPixi, { PIXI } from 'expo-pixi';
+import { Asset } from 'expo-asset';
+import { ScrollView, Image, ImageBackground } from 'react-native'
 import {
     Container, Header, Title, Content, Footer,
     FooterTab, Button, Left, Right, Body, Icon, Text,
@@ -17,13 +19,9 @@ import {
 } from '@expo/vector-icons';
 
 export default function Editor(props) {
-    const [screenHeight, setscreenHeight] = useState(600)
     const [defaultPicture, setdefaultPicture] = useState(null)
 
     useEffect(() => {
-        const screenHeight = Math.round(Dimensions.get('window').height);
-        setscreenHeight(screenHeight)
-
         getLastPictureFromGallary()
 
         //if back key is pressed on the phone, close editor
@@ -40,8 +38,12 @@ export default function Editor(props) {
             first: 1,
             sortBy: MediaLibrary.SortBy.creationTime
         })
-        console.log(fisrtPicture)
-        await setdefaultPicture(fisrtPicture.assets[0].uri)
+        //console.log(fisrtPicture)
+        const asset = fisrtPicture.assets[0]
+        await setdefaultPicture(asset)
+
+        console.log(Asset.fromModule(require('./assets/background.jpg')))
+        console.log(asset)
     }
 
     return (
@@ -62,12 +64,18 @@ export default function Editor(props) {
                     </Button>
                 </Right>
             </Header>
-            <Content>
-                <Image source={{ uri: props.picture ? props.picture : defaultPicture }}
-                    style={{ height: 0.6 * screenHeight, resizeMode: 'stretch' }}>
-                </Image>
+            <View style={{ flex: 1 }}>
+                <ImageBackground source={require('./assets/background.jpg')}
+                    style={{ flex: 0.7, resizeMode: 'stretch' }}>
+                    <ExpoPixi.FilterImage
+                        source={Asset.fromModule(require('./assets/background.jpg'))}
+                        resizeMode={'contain'}
+                        style={{ flex: 0.7 }}
+                        filters={[new PIXI.filters.NoiseFilter()]}
+                    />
+                </ImageBackground>
 
-            </Content>
+            </View>
         </Container>
     )
 }
