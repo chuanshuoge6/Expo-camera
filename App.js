@@ -97,16 +97,16 @@ export default function App() {
   takePicture = async () => {
 
     if (this.camera) {
-      toggleautoFocus()
+      /*toggleautoFocus()
       await timeout(100)
       toggleautoFocus()
       await timeout(100)
       toggleautoFocus()
       await timeout(100)
       toggleautoFocus()
-      await timeout(1000)
+      await timeout(1000)*/
 
-      const { uri } = await this.camera.takePictureAsync();
+      const { uri } = await this.camera.takePictureAsync({ skipProcessing: true });
 
       await MediaLibrary.saveToLibraryAsync(uri)
         .then(() => {
@@ -495,7 +495,7 @@ export default function App() {
             backgroundColor: 'white',
             zIndex: 4,
           }}>
-            <Editor picture={lastPicture} closeEditor={() => setopenEditor(false)}></Editor>
+            <Editor closeEditor={() => setopenEditor(false)}></Editor>
           </View> : null}
       </View>
     </PinchGestureHandler>
