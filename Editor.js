@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BackHandler } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import { MainBundlePath, DocumentDirectoryPath } from 'react-native-fs'
+import { zip } from 'react-native-zip-archive'
 import { Image, ImageBackground, Alert, Dimensions, ScrollView } from 'react-native'
 import {
     Container, Header, Title, Content, Footer,
@@ -25,10 +29,11 @@ export default function Editor(props) {
     const [currentPic, setcurrentPic] = useState(0)
     const [openGridView, setopenGridView] = useState(false)
     const [selectedPic, setselectedPic] = useState([])
+    const [activeFab, setactiveFab] = useState(false)
 
     useEffect(() => {
         setcurrentPic(0)
-        getLastPictureFromGallary()
+        getPictureFromGallary()
 
         //if back key is pressed on the phone, close editor
         BackHandler.addEventListener('hardwareBackPress', () => {
@@ -39,14 +44,13 @@ export default function Editor(props) {
         return () => { BackHandler.removeEventListener('hardwareBackPress') }
     }, [])
 
-    getLastPictureFromGallary = async () => {
+    getPictureFromGallary = async () => {
         const pics = await MediaLibrary.getAssetsAsync({
             sortBy: MediaLibrary.SortBy.creationTime
         })
 
         //await setdefaultPicture(pics.assets[0].uri)
         await setgalleryPic(pics.assets)
-
     }
 
     previousPic = () => {
@@ -98,6 +102,37 @@ export default function Editor(props) {
         setcurrentPic(0)
     }
 
+    shareImage = async (image) => {
+        //copy image from memory to app cache, app cache will be automatically cleaned when storage is low
+        //sharing can't access 'file:///storage/emulated/0/DCIM/e3bda948-2407-47e1-b5cf-12e7705bf86e.jpg'
+        //have to copy to 'file:///data/user/0/host.exp.exponent/cache/ExperienceData/%2540chuanshuoge%252Fexpo-medialibrary/e3bda948-2407-47e1-b5cf-12e7705bf86e.jpg'
+        //console.log(FileSystem.cacheDirectory + image.filename)
+        await FileSystem.copyAsync({
+            from: image.uri,
+            to: FileSystem.cacheDirectory + image.filename
+        })
+
+        await Sharing.shareAsync(FileSystem.cacheDirectory + image.filename)
+    }
+
+    shareMultiple = async () => {
+        //create directory for storing selected pics
+        const newFolder = FileSystem.cacheDirectory + Date.parse(new Date()) + '/'
+        await FileSystem.makeDirectoryAsync(newFolder)
+
+        //copy selected images into new folder in app cache
+        selectedPic.forEach(async (id) => {
+            const sharePic = gallaryPic.find(item => item.id === id)
+
+            await FileSystem.copyAsync({
+                from: sharePic.uri,
+                to: newFolder + sharePic.filename
+            })
+        })
+
+        console.log(MainBundlePath, DocumentDirectoryPath)
+    }
+
     return (
         <Container>
             <Header style={{ marginTop: 25 }}>
@@ -134,32 +169,50 @@ export default function Editor(props) {
                     </ImageBackground>
                     : null}
 
+                {openGridView ? null :
+                    <Fab
+                        active={activeFab}
+                        direction="up"
+                        containerStyle={{}}
+                        style={{ backgroundColor: '#5067FF' }}
+                        position="bottomRight"
+                        onPress={() => activeFab ? setactiveFab(false) : setactiveFab(true)}>
+                        <Foundation name='social-yelp'></Foundation>
 
+                        <Button style={{ backgroundColor: '#34A34F' }}
+                            onPress={() => shareImage(gallaryPic[currentPic])}>
+                            <Foundation name='share' size={30} color="white"></Foundation>
+                        </Button>
+                        <Button style={{ backgroundColor: '#3B5998' }}
+                            onPress={() => alert('double tap on image to zoom')}>
+                            <Foundation name='zoom-in' size={30} color="white"></Foundation>
+                        </Button>
+                        <Button style={{ backgroundColor: '#DD5144' }}
+                            onPress={() =>
+                                Alert.alert(
+                                    'Delete current picture?',
+                                    '',
+                                    [{
+                                        text: 'Cancel',
+                                        onPress: () => { },
+                                        style: 'cancel',
+                                    },
+                                    { text: 'OK', onPress: () => confirmDelete() },
+                                    ],
+                                    { cancelable: true },
+                                )
+                            }>
+                            <MaterialIcons name='delete' size={30} color="white" />
+                        </Button>
+                    </Fab>
+                }
             </View>
+
             {openGridView ? null :
                 <Footer>
                     <FooterTab>
                         <Button active onPress={() => previousPic()}>
                             <Text>Previous</Text>
-                        </Button>
-                        <Button active onPress={() => alert('Double tap on image to zoom')}>
-                            <Text>Zoom</Text>
-                        </Button>
-                        <Button active onPress={() =>
-                            Alert.alert(
-                                'Delete current picture?',
-                                '',
-                                [{
-                                    text: 'Cancel',
-                                    onPress: () => { },
-                                    style: 'cancel',
-                                },
-                                { text: 'OK', onPress: () => confirmDelete() },
-                                ],
-                                { cancelable: true },
-                            )
-                        }>
-                            <Text>Delete</Text>
                         </Button>
                         <Button active onPress={() => nextPic()}>
                             <Text>Next</Text>
@@ -189,7 +242,13 @@ export default function Editor(props) {
                         </Body>
                         <Right>
                             {selectedPic.length > 0 ?
-                                <Button transparent iconRight onPress={() =>
+                                <Button transparent onPress={() => shareMultiple()}>
+                                    <Foundation name='share' size={40} color="white"></Foundation>
+                                </Button>
+                                : null}
+
+                            {selectedPic.length > 0 ?
+                                <Button transparent onPress={() =>
                                     Alert.alert(
                                         'Delete selected pictures?',
                                         '',
