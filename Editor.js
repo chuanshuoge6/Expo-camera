@@ -3,8 +3,6 @@ import { BackHandler } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { MainBundlePath, DocumentDirectoryPath } from 'react-native-fs'
-import { zip } from 'react-native-zip-archive'
 import { Image, ImageBackground, Alert, Dimensions, ScrollView } from 'react-native'
 import {
     Container, Header, Title, Content, Footer,
@@ -115,24 +113,6 @@ export default function Editor(props) {
         await Sharing.shareAsync(FileSystem.cacheDirectory + image.filename)
     }
 
-    shareMultiple = async () => {
-        //create directory for storing selected pics
-        const newFolder = FileSystem.cacheDirectory + Date.parse(new Date()) + '/'
-        await FileSystem.makeDirectoryAsync(newFolder)
-
-        //copy selected images into new folder in app cache
-        selectedPic.forEach(async (id) => {
-            const sharePic = gallaryPic.find(item => item.id === id)
-
-            await FileSystem.copyAsync({
-                from: sharePic.uri,
-                to: newFolder + sharePic.filename
-            })
-        })
-
-        console.log(MainBundlePath, DocumentDirectoryPath)
-    }
-
     return (
         <Container>
             <Header style={{ marginTop: 25 }}>
@@ -241,12 +221,6 @@ export default function Editor(props) {
                             <Title>Gallary</Title>
                         </Body>
                         <Right>
-                            {selectedPic.length > 0 ?
-                                <Button transparent onPress={() => shareMultiple()}>
-                                    <Foundation name='share' size={40} color="white"></Foundation>
-                                </Button>
-                                : null}
-
                             {selectedPic.length > 0 ?
                                 <Button transparent onPress={() =>
                                     Alert.alert(
