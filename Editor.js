@@ -3,6 +3,7 @@ import { BackHandler } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Image, ImageBackground, Alert, Dimensions, ScrollView } from 'react-native'
 import {
     Container, Header, Title, Content, Footer,
@@ -44,7 +45,7 @@ export default function Editor(props) {
 
     getPictureFromGallary = async () => {
         const pics = await MediaLibrary.getAssetsAsync({
-            sortBy: MediaLibrary.SortBy.creationTime
+            sortBy: MediaLibrary.SortBy.modificationTime
         })
 
         //await setdefaultPicture(pics.assets[0].uri)
@@ -65,14 +66,20 @@ export default function Editor(props) {
         currentPic < length - 1 ? setcurrentPic(currentPic + 1) : setcurrentPic(0)
     }
 
-    confirmDelete = async () => {
+    confirmDelete = async (image) => {
         //remove picture in android directory
-        await MediaLibrary.deleteAssetsAsync(gallaryPic[currentPic])
-        //remove picture in memory
-        setgalleryPic(gallaryPic.filter(item => { return item !== gallaryPic[currentPic] }))
-        //correct current pic index
-        previousPic()
-        nextPic()
+        await MediaLibrary.deleteAssetsAsync(image)
+            .then(async () => {
+                //remove picture in memory
+                await setgalleryPic(gallaryPic.filter(item => item.id !== image.id))
+                await setselectedPic(selectedPic.filter(id => id !== image.id))
+                //correct current pic index
+                previousPic()
+                nextPic()
+            })
+            .catch(error => {
+                alert(error)
+            });
     }
 
     togglePicHighlight = (id) => {
@@ -87,17 +94,21 @@ export default function Editor(props) {
     }
 
     deletePics = () => {
+        let i = 0
         selectedPic.forEach(async (id) => {
-            removePic = gallaryPic.find(item => item.id === id)
+            const removePic = gallaryPic.find(item => item.id === id)
             //remove picture in android directory
             await MediaLibrary.deleteAssetsAsync(removePic)
+            i++
+            //all pics deleted from android storage
+            if (i === selectedPic.length) {
+                //remove picture in memory
+                setgalleryPic(gallaryPic.filter(item => !selectedPic.includes(item.id)))
+
+                setselectedPic([])
+                setcurrentPic(0)
+            }
         })
-
-        //remove picture in memory
-        setgalleryPic(gallaryPic.filter(item => !selectedPic.includes(item.id)))
-
-        setselectedPic([])
-        setcurrentPic(0)
     }
 
     shareImage = async (image) => {
@@ -111,6 +122,50 @@ export default function Editor(props) {
         })
 
         await Sharing.shareAsync(FileSystem.cacheDirectory + image.filename)
+    }
+
+    rotatePic = async (image) => {
+        //console.log(image)
+        const newImage = await ImageManipulator.manipulateAsync(
+            image.uri,
+            [{ rotate: 90 }],
+            {
+                compress: 1,
+                format: image.filename.includes('png') ? ImageManipulator.SaveFormat.PNG :
+                    ImageManipulator.SaveFormat.JPEG
+            }
+        );
+        //console.log(newImage)
+        await MediaLibrary.saveToLibraryAsync(newImage.uri)
+            .then(async () => {
+                await getPictureFromGallary()
+                await setcurrentPic(0)
+            })
+            .catch(error => {
+                alert(error)
+            });
+        //console.log(gallaryPic)
+    }
+
+    mirrorPic = async (image) => {
+        const newImage = await ImageManipulator.manipulateAsync(
+            image.uri,
+            [{ flip: ImageManipulator.FlipType.Horizontal }],
+            {
+                compress: 1,
+                format: image.filename.includes('png') ? ImageManipulator.SaveFormat.PNG :
+                    ImageManipulator.SaveFormat.JPEG
+            }
+        );
+
+        await MediaLibrary.saveToLibraryAsync(newImage.uri)
+            .then(async () => {
+                await getPictureFromGallary()
+                await setcurrentPic(0)
+            })
+            .catch(error => {
+                alert(error)
+            });
     }
 
     return (
@@ -163,7 +218,15 @@ export default function Editor(props) {
                             onPress={() => shareImage(gallaryPic[currentPic])}>
                             <Foundation name='share' size={30} color="white"></Foundation>
                         </Button>
-                        <Button style={{ backgroundColor: '#3B5998' }}
+                        <Button style={{ backgroundColor: 'yellow' }}
+                            onPress={() => rotatePic(gallaryPic[currentPic])}>
+                            <MaterialCommunityIcons name='axis-x-rotate-clockwise' size={30} />
+                        </Button>
+                        <Button style={{ backgroundColor: 'pink' }}
+                            onPress={() => mirrorPic(gallaryPic[currentPic])}>
+                            <Octicons name='mirror' size={30} />
+                        </Button>
+                        <Button style={{ backgroundColor: 'purple' }}
                             onPress={() => alert('double tap on image to zoom')}>
                             <Foundation name='zoom-in' size={30} color="white"></Foundation>
                         </Button>
@@ -177,7 +240,7 @@ export default function Editor(props) {
                                         onPress: () => { },
                                         style: 'cancel',
                                     },
-                                    { text: 'OK', onPress: () => confirmDelete() },
+                                    { text: 'OK', onPress: () => confirmDelete(gallaryPic[currentPic]) },
                                     ],
                                     { cancelable: true },
                                 )
@@ -282,6 +345,17 @@ export default function Editor(props) {
                                                 </Row>
                                                 : null)
                                     })}
+                                    {
+                                        gallaryPic.length % 2 === 1 ?
+                                            <Row style={{ justifyContent: 'center', marginVertical: 5 }}>
+                                                <Button transparent
+                                                    style={{
+                                                        height: picWidth, width: picWidth
+                                                    }}>
+                                                </Button>
+                                            </Row>
+                                            : null
+                                    }
                                 </Col>
                             </Grid>
                             : null}
