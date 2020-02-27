@@ -4,7 +4,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Image, ImageBackground, Alert, Dimensions, ScrollView } from 'react-native'
+import { Image, ImageBackground, Alert, Dimensions, ScrollView, Slider } from 'react-native'
 import {
     Container, Header, Title, Content, Footer,
     FooterTab, Button, Left, Right, Body, Icon, Text,
@@ -20,6 +20,7 @@ import {
 } from '@expo/vector-icons';
 import ReactNativeZoomableView from '@dudigital/react-native-zoomable-view/src/ReactNativeZoomableView';
 import { Col, Row, Grid } from "react-native-easy-grid";
+import { CustomSlider } from './multiSlider/CustomSlider'
 
 const picWidth = Math.round(Dimensions.get('window').width) / 2 - 20;
 
@@ -29,6 +30,7 @@ export default function Editor(props) {
     const [openGridView, setopenGridView] = useState(false)
     const [selectedPic, setselectedPic] = useState([])
     const [activeFab, setactiveFab] = useState(false)
+    const [showSlider, setshowSlider] = useState(false)
 
     useEffect(() => {
         setcurrentPic(0)
@@ -168,24 +170,29 @@ export default function Editor(props) {
             });
     }
 
+    multiSliderValueCallback = (values) => {
+        console.log(values)
+    }
+
     return (
         <Container>
-            <Header style={{ marginTop: 25 }}>
-                <Left>
-                    <Button transparent onPress={() => props.closeEditor()}>
-                        <Ionicons name='ios-arrow-round-back' size={40} color="white"></Ionicons>
-                    </Button>
-                </Left>
-                <Body style={{ alignItems: 'center' }}>
-                    <Title>Editor</Title>
-                </Body>
-                <Right>
-                    <Button transparent iconRight onPress={() => setopenGridView(true)}>
-                        <Text style={{ color: 'white' }}>Gallary{' '}</Text>
-                        <Ionicons name='ios-arrow-round-forward' size={40} color="white"></Ionicons>
-                    </Button>
-                </Right>
-            </Header>
+            {showSlider ? null :
+                <Header style={{ marginTop: 25 }}>
+                    <Left>
+                        <Button transparent onPress={() => props.closeEditor()}>
+                            <Ionicons name='ios-arrow-round-back' size={40} color="white"></Ionicons>
+                        </Button>
+                    </Left>
+                    <Body style={{ alignItems: 'center' }}>
+                        <Title>Editor</Title>
+                    </Body>
+                    <Right>
+                        <Button transparent iconRight onPress={() => setopenGridView(true)}>
+                            <Text style={{ color: 'white' }}>Gallary{' '}</Text>
+                            <Ionicons name='ios-arrow-round-forward' size={40} color="white"></Ionicons>
+                        </Button>
+                    </Right>
+                </Header>}
             <View style={{ flex: 1 }}>
                 {gallaryPic.length > 0 ?
                     <ImageBackground source={require('./assets/background.jpg')}
@@ -226,6 +233,10 @@ export default function Editor(props) {
                             onPress={() => mirrorPic(gallaryPic[currentPic])}>
                             <Octicons name='mirror' size={30} />
                         </Button>
+                        <Button style={{ backgroundColor: 'cyan' }}
+                            onPress={() => { setshowSlider(true); setactiveFab(false) }}>
+                            <Foundation name='crop' size={30} />
+                        </Button>
                         <Button style={{ backgroundColor: 'purple' }}
                             onPress={() => alert('double tap on image to zoom')}>
                             <Foundation name='zoom-in' size={30} color="white"></Foundation>
@@ -251,7 +262,7 @@ export default function Editor(props) {
                 }
             </View>
 
-            {openGridView ? null :
+            {openGridView || showSlider ? null :
                 <Footer>
                     <FooterTab>
                         <Button active onPress={() => previousPic()}>
@@ -263,6 +274,19 @@ export default function Editor(props) {
                     </FooterTab>
                 </Footer>
             }
+
+            {showSlider ?
+                <Footer style={{ zIndex: 7 }}>
+                    <FooterTab>
+                        <Button active onPress={() => previousPic()}>
+                            <Text>confirm</Text>
+                        </Button>
+                        <Button active onPress={() => { setshowSlider(false); setactiveFab(true) }}>
+                            <Text>Cancel</Text>
+                        </Button>
+                    </FooterTab>
+                </Footer>
+                : null}
 
             {openGridView ?
                 <View style={{
@@ -361,6 +385,30 @@ export default function Editor(props) {
                             : null}
                     </ScrollView>
                 </View> : null}
+
+            {showSlider ?
+                <View style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    left: 0,
+                    top: 0,
+                    backgroundColor: 'transparent',
+                    zIndex: 6,
+                }}>
+                    <View style={{ marginTop: 25 }}>
+                        <CustomSlider
+                            min={1}
+                            max={7}
+                            LRpadding={40}
+                            callback={this.multiSliderValueCallback}
+                            single={false}
+                        />
+                    </View>
+                </View>
+                : null
+
+            }
         </Container>
     )
 }
