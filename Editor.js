@@ -31,6 +31,12 @@ export default function Editor(props) {
     const [selectedPic, setselectedPic] = useState([])
     const [activeFab, setactiveFab] = useState(false)
     const [showSlider, setshowSlider] = useState(false)
+    const [sliderX, setsliderX] = useState([0, 10])
+    const [sliderY, setsliderY] = useState([0, 10])
+    const [cropX, setcropX] = useState(0)
+    const [cropY, setcropY] = useState(0)
+    const [cropWidth, setcropWidth] = useState(Dimensions.get('window').width)
+    const [cropHeight, setcropHeight] = useState(Dimensions.get('window').height)
 
     useEffect(() => {
         setcurrentPic(0)
@@ -170,8 +176,63 @@ export default function Editor(props) {
             });
     }
 
-    multiSliderValueCallback = (values) => {
-        console.log(values)
+    sliderXChange = (markers) => {
+        setsliderX(markers)
+
+        this.myImage.measure((fx, fy, width, height, px, py) => {
+            /*console.log('Component width is: ' + width)
+            console.log('Component height is: ' + height)
+            console.log('X offset to frame: ' + fx)
+            console.log('Y offset to frame: ' + fy)
+            console.log('X offset to page: ' + px)
+            console.log('Y offset to page: ' + py)*/
+            setcropX(width * markers[0] / 10 + px)
+            setcropWidth(width * (markers[1] - markers[0]) / 10)
+        })
+
+    }
+
+    sliderYChange = (markers) => {
+        setsliderY(markers)
+
+        this.myImage.measure((fx, fy, width, height, px, py) => {
+            setcropY(height * markers[0] / 10 + py)
+            setcropHeight(height * (markers[1] - markers[0]) / 10)
+        })
+    }
+
+    cropPic = async (image) => {
+        const cropShape = {
+            originX: image.width * sliderX[0] / 10,
+            width: image.width * (sliderX[1] - sliderX[0]) / 10,
+            originY: image.height * sliderY[0] / 10,
+            height: image.height * (sliderY[1] - sliderY[0]) / 10,
+        }
+
+        const newImage = await ImageManipulator.manipulateAsync(
+            image.uri,
+            [{ crop: cropShape }],
+            {
+                compress: 1,
+                format: image.filename.includes('png') ? ImageManipulator.SaveFormat.PNG :
+                    ImageManipulator.SaveFormat.JPEG
+            }
+        );
+
+        await MediaLibrary.saveToLibraryAsync(newImage.uri)
+            .then(async () => {
+                await getPictureFromGallary()
+                await setcurrentPic(0)
+                await setsliderX([0, 10])
+                await setsliderY([0, 10])
+                await setcropX(0)
+                await setcropY(0)
+                await setcropWidth(Dimensions.get('window').width)
+                await setcropHeight(Dimensions.get('window').height)
+            })
+            .catch(error => {
+                alert(error)
+            });
     }
 
     return (
@@ -192,22 +253,32 @@ export default function Editor(props) {
                             <Ionicons name='ios-arrow-round-forward' size={40} color="white"></Ionicons>
                         </Button>
                     </Right>
-                </Header>}
+                </Header>
+            }
             <View style={{ flex: 1 }}>
                 {gallaryPic.length > 0 ?
                     <ImageBackground source={require('./assets/background.jpg')}
                         style={{ flex: 1, resizeMode: 'stretch' }}>
-                        <ReactNativeZoomableView
-                            maxZoom={1.5}
-                            minZoom={0.5}
-                            zoomStep={0.5}
-                            initialZoom={1}
-                            bindToBorders={true}>
+                        {showSlider ? null :
+                            <ReactNativeZoomableView
+                                maxZoom={1.5}
+                                minZoom={0.5}
+                                zoomStep={0.5}
+                                initialZoom={1}
+                                bindToBorders={true}>
 
-                            <Image style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
-                                source={{ uri: gallaryPic[currentPic].uri }} />
-
-                        </ReactNativeZoomableView>
+                                <Image style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
+                                    source={{ uri: gallaryPic[currentPic].uri }}
+                                />
+                            </ReactNativeZoomableView>
+                        }
+                        {showSlider ?
+                            <Image style={{ width: '100%', height: '100%', resizeMode: 'stretch' }}
+                                source={{ uri: gallaryPic[currentPic].uri }}
+                                ref={ref => { this.myImage = ref }}
+                            />
+                            : null
+                        }
                     </ImageBackground>
                     : null}
 
@@ -276,9 +347,12 @@ export default function Editor(props) {
             }
 
             {showSlider ?
-                <Footer style={{ zIndex: 7 }}>
+                <Footer style={{ zIndex: 8 }}>
                     <FooterTab>
-                        <Button active onPress={() => previousPic()}>
+                        <Button active onPress={() => {
+                            cropPic(gallaryPic[currentPic]);
+                            setshowSlider(false); setactiveFab(true)
+                        }}>
                             <Text>confirm</Text>
                         </Button>
                         <Button active onPress={() => { setshowSlider(false); setactiveFab(true) }}>
@@ -396,18 +470,45 @@ export default function Editor(props) {
                     backgroundColor: 'transparent',
                     zIndex: 6,
                 }}>
-                    <View style={{ marginTop: 25 }}>
-                        <CustomSlider
-                            min={1}
-                            max={7}
-                            LRpadding={40}
-                            callback={this.multiSliderValueCallback}
-                            single={false}
-                        />
-                    </View>
+                    <Button transparent
+                        style={{
+                            height: cropHeight, width: cropWidth,
+                            left: cropX, top: cropY,
+                            borderColor: 'red',
+                            borderWidth: 5
+                        }} />
                 </View>
                 : null
+            }
 
+            {showSlider ?
+                <View style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    left: 0,
+                    top: 0,
+                    backgroundColor: 'transparent',
+                    zIndex: 7,
+                    justifyContent: "space-around"
+                }}>
+                    <CustomSlider
+                        min={0}
+                        max={10}
+                        LRpadding={40}
+                        callback={(e) => sliderXChange(e)}
+                        single={false}
+                    />
+
+                    <CustomSlider
+                        min={0}
+                        max={10}
+                        LRpadding={40}
+                        callback={(e) => sliderYChange(e)}
+                        single={false}
+                    />
+                </View>
+                : null
             }
         </Container>
     )
